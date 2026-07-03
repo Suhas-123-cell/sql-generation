@@ -6,74 +6,109 @@
 <title>Text-to-SQL — fine-tuned Qwen2.5-1.5B</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
   body {
     font: 15px/1.5 -apple-system, "Segoe UI", sans-serif;
     background: #0f1117; color: #e6e8ee;
-    max-width: 720px; margin: 0 auto; padding: 48px 20px;
+    max-width: 760px; margin: 0 auto; padding: 24px 20px;
+    display: flex; flex-direction: column; gap: 14px;
   }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  p.sub { color: #8a90a4; margin-bottom: 28px; font-size: 13px; }
-  label { display: block; font-size: 12px; color: #8a90a4; text-transform: uppercase;
-          letter-spacing: .06em; margin: 18px 0 6px; }
-  textarea, input {
-    width: 100%; background: #181b25; color: #e6e8ee;
-    border: 1px solid #2a2f3f; border-radius: 8px; padding: 10px 12px;
+  h1 { font-size: 18px; }
+  h1 span { color: #8a90a4; font-size: 12px; font-weight: 400; margin-left: 8px; }
+
+  details {
+    background: #181b25; border: 1px solid #2a2f3f; border-radius: 10px; padding: 10px 14px;
+  }
+  summary { cursor: pointer; font-size: 12px; color: #8a90a4;
+            text-transform: uppercase; letter-spacing: .06em; }
+  textarea {
+    width: 100%; height: 84px; margin-top: 10px; resize: vertical;
+    background: #0f1117; color: #e6e8ee; border: 1px solid #2a2f3f;
+    border-radius: 8px; padding: 10px 12px;
     font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
   }
-  textarea { height: 96px; resize: vertical; }
   textarea:focus, input:focus { outline: none; border-color: #5b7cfa; }
+
+  #chat { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+          padding: 4px 2px; }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; }
+  .user { align-self: flex-end; background: #5b7cfa; color: #fff;
+          border-bottom-right-radius: 4px; }
+  .bot  { align-self: flex-start; background: #181b25; border: 1px solid #2a2f3f;
+          border-left: 3px solid #4ade80; border-bottom-left-radius: 4px;
+          font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+          white-space: pre-wrap; word-break: break-word; }
+  .hint { align-self: center; color: #8a90a4; font-size: 13px; margin-top: 24px; }
+
+  form { display: flex; gap: 8px; }
+  input {
+    flex: 1; background: #181b25; color: #e6e8ee; border: 1px solid #2a2f3f;
+    border-radius: 10px; padding: 12px 14px; font-size: 14px;
+  }
   button {
-    margin-top: 16px; padding: 10px 22px; border: 0; border-radius: 8px;
-    background: #5b7cfa; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+    padding: 0 22px; border: 0; border-radius: 10px; background: #5b7cfa;
+    color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   button:disabled { opacity: .5; cursor: wait; }
-  pre {
-    margin-top: 24px; padding: 14px; background: #181b25; border-radius: 8px;
-    border-left: 3px solid #4ade80; white-space: pre-wrap; word-break: break-word;
-    font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; min-height: 20px;
-  }
-  pre:empty { display: none; }
 </style>
 </head>
 <body>
-  <h1>Text-to-SQL</h1>
-  <p class="sub">Qwen2.5-1.5B-Instruct + LoRA adapter, running locally via MLX</p>
+  <h1>Text-to-SQL<span>Qwen2.5-1.5B + LoRA, local via MLX</span></h1>
 
-  <label for="schema">Schema (CREATE TABLE ...)</label>
-  <textarea id="schema">CREATE TABLE employees (name VARCHAR, department VARCHAR, salary INTEGER, hire_year INTEGER)</textarea>
+  <details id="schemaBox" open>
+    <summary>Schema — set once, then just chat</summary>
+    <textarea id="schema">CREATE TABLE employees (name VARCHAR, department VARCHAR, salary INTEGER, hire_year INTEGER)</textarea>
+  </details>
 
-  <label for="question">Question</label>
-  <input id="question" value="What is the average salary of employees hired after 2020?">
+  <div id="chat">
+    <div class="hint">Ask a question about your schema, e.g.
+      “What is the average salary of employees hired after 2020?”</div>
+  </div>
 
-  <button id="go">Generate SQL</button>
-  <pre id="out"></pre>
+  <form id="form">
+    <input id="question" placeholder="Ask a question about your data…" autocomplete="off" autofocus>
+    <button id="send">Send</button>
+  </form>
 
 <script>
-  const go = document.getElementById("go");
-  const out = document.getElementById("out");
+  const chat = document.getElementById("chat");
+  const schemaBox = document.getElementById("schemaBox");
+  const question = document.getElementById("question");
+  const send = document.getElementById("send");
 
-  async function run() {
-    go.disabled = true;
-    out.textContent = "generating…";
+  function bubble(cls, text) {
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  document.getElementById("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = question.value.trim();
+    if (!q || send.disabled) return;
+
+    document.querySelector(".hint")?.remove();
+    schemaBox.open = false;              // schema is set; get out of the way
+    bubble("user", q);
+    question.value = "";
+    send.disabled = true;
+    const reply = bubble("bot", "generating…");
+
     try {
       const res = await fetch("/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schema: document.getElementById("schema").value,
-          question: document.getElementById("question").value,
-        }),
+        body: JSON.stringify({ schema: document.getElementById("schema").value, question: q }),
       });
-      out.textContent = (await res.json()).sql;
+      reply.textContent = (await res.json()).sql;
     } catch (err) {
-      out.textContent = "error: " + err.message + " — is demo_server.py running?";
+      reply.textContent = "error: " + err.message + " — is demo_server.py running?";
     }
-    go.disabled = false;
-  }
-
-  go.addEventListener("click", run);
-  document.getElementById("question").addEventListener("keydown", e => {
-    if (e.key === "Enter") run();
+    send.disabled = false;
+    question.focus();
   });
 </script>
 </body>
