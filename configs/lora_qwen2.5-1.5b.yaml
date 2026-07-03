@@ -1,0 +1,28 @@
+# LoRA fine-tuning recipe for text-to-SQL on Apple Silicon (16 GB).
+# QLoRA-style: the base model ships 4-bit quantized and stays frozen;
+# only the rank-16 adapters train.
+model: "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+train: true
+data: "data"
+seed: 42
+
+# 1200 iters x batch 4 = 4,800 training examples seen (~0.6 epoch of the 8k split) —
+# text-to-SQL converges fast; bump iters to 2000 for a full epoch if time allows.
+batch_size: 4
+iters: 1200
+learning_rate: 1e-4
+max_seq_length: 1024
+
+# adapt the top 16 of 28 transformer layers — good quality/memory trade-off on 16 GB
+num_layers: 16
+lora_parameters:
+  rank: 16
+  scale: 16.0
+  dropout: 0.0
+
+val_batches: 25
+steps_per_report: 10
+steps_per_eval: 200
+save_every: 200
+adapter_path: "adapters"
+grad_checkpoint: true
