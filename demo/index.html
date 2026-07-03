@@ -39,6 +39,7 @@
           font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
           white-space: pre-wrap; word-break: break-word; }
   .hint { align-self: center; color: #8a90a4; font-size: 13px; margin-top: 24px; }
+  .note { align-self: center; color: #4ade80; font-size: 12px; }
 
   form { display: flex; gap: 8px; }
   input {
@@ -103,7 +104,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ schema: document.getElementById("schema").value, question: q }),
       });
-      reply.textContent = (await res.json()).sql;
+      const sql = (await res.json()).sql;
+      reply.textContent = sql;
+      // DDL replies become part of the schema, so follow-up questions can use them
+      if (/^(create|alter)\s+table/i.test(sql)) {
+        const box = document.getElementById("schema");
+        const cur = box.value.trim();
+        box.value = cur ? cur.replace(/;+$/, "") + ";\n" + sql : sql;
+        bubble("note", "✓ added to schema");
+      }
     } catch (err) {
       reply.textContent = "error: " + err.message + " — is demo_server.py running?";
     }
