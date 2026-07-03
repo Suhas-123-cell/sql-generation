@@ -43,6 +43,17 @@ python scripts/generate_predictions.py    # base + fine-tuned SQL for the 200 te
 python scripts/evaluate.py --examples 5   # metrics table + before/after examples
 ```
 
+### Try it manually
+
+```bash
+python scripts/demo_server.py             # then open http://localhost:8765
+```
+
+A one-page playground: paste a schema, ask a question, get the SQL. It uses the
+same prompt template and extraction as the evaluation, so what you see is what
+was measured. Works best on WikiSQL-style questions (filters, single aggregates);
+multi-step reasoning like GROUP BY + ranking is outside the training distribution.
+
 ## Repository layout
 
 ```
