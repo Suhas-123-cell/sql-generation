@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text-to-SQL — fine-tuned Qwen2.5-1.5B</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font: 15px/1.5 -apple-system, "Segoe UI", sans-serif;
+    background: #0f1117; color: #e6e8ee;
+    max-width: 720px; margin: 0 auto; padding: 48px 20px;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.sub { color: #8a90a4; margin-bottom: 28px; font-size: 13px; }
+  label { display: block; font-size: 12px; color: #8a90a4; text-transform: uppercase;
+          letter-spacing: .06em; margin: 18px 0 6px; }
+  textarea, input {
+    width: 100%; background: #181b25; color: #e6e8ee;
+    border: 1px solid #2a2f3f; border-radius: 8px; padding: 10px 12px;
+    font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  textarea { height: 96px; resize: vertical; }
+  textarea:focus, input:focus { outline: none; border-color: #5b7cfa; }
+  button {
+    margin-top: 16px; padding: 10px 22px; border: 0; border-radius: 8px;
+    background: #5b7cfa; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: wait; }
+  pre {
+    margin-top: 24px; padding: 14px; background: #181b25; border-radius: 8px;
+    border-left: 3px solid #4ade80; white-space: pre-wrap; word-break: break-word;
+    font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; min-height: 20px;
+  }
+  pre:empty { display: none; }
+</style>
+</head>
+<body>
+  <h1>Text-to-SQL</h1>
+  <p class="sub">Qwen2.5-1.5B-Instruct + LoRA adapter, running locally via MLX</p>
+
+  <label for="schema">Schema (CREATE TABLE ...)</label>
+  <textarea id="schema">CREATE TABLE employees (name VARCHAR, department VARCHAR, salary INTEGER, hire_year INTEGER)</textarea>
+
+  <label for="question">Question</label>
+  <input id="question" value="What is the average salary of employees hired after 2020?">
+
+  <button id="go">Generate SQL</button>
+  <pre id="out"></pre>
+
+<script>
+  const go = document.getElementById("go");
+  const out = document.getElementById("out");
+
+  async function run() {
+    go.disabled = true;
+    out.textContent = "generating…";
+    try {
+      const res = await fetch("/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schema: document.getElementById("schema").value,
+          question: document.getElementById("question").value,
+        }),
+      });
+      out.textContent = (await res.json()).sql;
+    } catch (err) {
+      out.textContent = "error: " + err.message + " — is demo_server.py running?";
+    }
+    go.disabled = false;
+  }
+
+  go.addEventListener("click", run);
+  document.getElementById("question").addEventListener("keydown", e => {
+    if (e.key === "Enter") run();
+  });
+</script>
+</body>
+</html>
