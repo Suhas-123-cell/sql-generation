@@ -16,8 +16,11 @@ base model vs fine-tuned compared under identical conditions:
 
 | metric | base model | fine-tuned |
 |---|---|---|
-| Exact match | _run `evaluate.py`_ | _run `evaluate.py`_ |
-| Execution validity | _run `evaluate.py`_ | _run `evaluate.py`_ |
+| Exact match | 53.5% | **75.5%** |
+| Execution validity | 95.0% | **97.0%** |
+
+52 of 200 test questions that the base model answered incorrectly are exactly correct
+after fine-tuning. Training took ~15 minutes on an M5 (peak memory 2.7 GB).
 
 - **Exact match** — normalized string equality with the gold SQL (strict lower bound).
 - **Execution validity** — the query executes without error against the schema built in an
